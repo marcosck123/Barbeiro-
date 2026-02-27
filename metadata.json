@@ -1,0 +1,5 @@
+{
+  "name": "BarberFlow",
+  "description": "Sistema completo de agendamento para barbearias com painel administrativo, gestão de barbeiros e catálogo de cortes.",
+  "requestFramePermissions": []
+}
