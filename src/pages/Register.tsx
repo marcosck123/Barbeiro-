@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Scissors } from 'lucide-react';
 
 export default function Register() {
   const [email, setEmail] = useState('');
