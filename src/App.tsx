@@ -1,314 +1,571 @@
 import React, { useState, useEffect } from 'react';
-import { format, addDays, subDays, startOfDay, isSameDay, parseISO, addMinutes, isWithinInterval } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Plus, 
-  Clock, 
-  User, 
   Scissors, 
-  Calendar as CalendarIcon,
-  Trash2,
-  CheckCircle2,
-  XCircle,
-  MoreVertical
+  User, 
+  Calendar as CalendarIcon, 
+  Clock, 
+  CreditCard, 
+  ChevronRight, 
+  Star, 
+  Check, 
+  ArrowLeft,
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Appointment, Service } from './types';
+import { format, addDays, startOfDay, isSameDay, parseISO, addMinutes } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Appointment, Service, Barber, User as UserType } from './types';
 import { storageService } from './services/storage';
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 8); // 08:00 to 21:00
+// --- Components ---
+
+const Navbar = ({ user, onLogout, onOpenAuth }: { user: UserType | null, onLogout: () => void, onOpenAuth: () => void }) => (
+  <nav className="border-b border-white/10 sticky top-0 bg-black/80 backdrop-blur-md z-50">
+    <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+      <div className="flex items-center gap-2 font-bold text-2xl tracking-tighter">
+        <Scissors className="w-6 h-6 text-white" />
+        <span>BarberFlow</span>
+      </div>
+      
+      <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
+        <a href="#services" className="hover:text-white transition-colors">Serviços</a>
+        <a href="#barbers" className="hover:text-white transition-colors">Barbeiros</a>
+        <a href="#about" className="hover:text-white transition-colors">Sobre</a>
+      </div>
+
+      <div className="flex items-center gap-4">
+        {user ? (
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-400">Olá, <span className="text-white font-bold">{user.name}</span></span>
+            <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+        ) : (
+          <button 
+            onClick={onOpenAuth}
+            className="bg-white text-black px-6 py-2 rounded-full text-sm font-bold hover:bg-gray-200 transition-all"
+          >
+            Entrar / Cadastrar
+          </button>
+        )}
+      </div>
+    </div>
+  </nav>
+);
+
+const StepIndicator = ({ currentStep }: { currentStep: number }) => {
+  const steps = ['Serviço', 'Barbeiro', 'Horário', 'Pagamento'];
+  return (
+    <div className="flex items-center justify-center gap-4 mb-12">
+      {steps.map((step, idx) => (
+        <React.Fragment key={step}>
+          <div className="flex flex-col items-center gap-2">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all ${
+              idx + 1 <= currentStep ? 'bg-white border-white text-black' : 'border-white/20 text-white/20'
+            }`}>
+              {idx + 1 < currentStep ? <Check className="w-5 h-5" /> : idx + 1}
+            </div>
+            <span className={`text-[10px] uppercase tracking-widest font-bold ${
+              idx + 1 <= currentStep ? 'text-white' : 'text-white/20'
+            }`}>{step}</span>
+          </div>
+          {idx < steps.length - 1 && (
+            <div className={`w-12 h-[2px] mb-6 ${idx + 1 < currentStep ? 'bg-white' : 'bg-white/10'}`} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
+
+// --- Main App ---
 
 export default function App() {
-  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [services] = useState<Service[]>(storageService.getServices());
+  const [view, setView] = useState<'landing' | 'booking' | 'admin'>('landing');
+  const [step, setStep] = useState(1);
+  const [user, setUser] = useState<UserType | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   
-  // Form state
-  const [formData, setFormData] = useState({
-    clientName: '',
-    serviceId: services[0]?.id || '',
-    time: '09:00',
-    notes: ''
-  });
+  // Booking State
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
+  const [selectedTime, setSelectedTime] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<Appointment['paymentMethod'] | ''>('');
+
+  const services = storageService.getServices();
+  const barbers = storageService.getBarbers();
 
   useEffect(() => {
-    setAppointments(storageService.getAppointments());
+    setUser(storageService.getCurrentUser());
   }, []);
 
-  const handlePrevDay = () => setSelectedDate(subDays(selectedDate, 1));
-  const handleNextDay = () => setSelectedDate(addDays(selectedDate, 1));
-  const handleToday = () => setSelectedDate(startOfDay(new Date()));
+  const handleLogout = () => {
+    storageService.setCurrentUser(null);
+    setUser(null);
+    setView('landing');
+  };
 
-  const filteredAppointments = appointments.filter(app => 
-    isSameDay(parseISO(app.date), selectedDate)
-  );
-
-  const handleAddAppointment = (e: React.FormEvent) => {
+  const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
-    const service = services.find(s => s.id === formData.serviceId);
-    if (!service) return;
+    const target = e.target as any;
+    const email = target.email.value;
+    const name = authMode === 'register' ? target.name.value : '';
 
-    const [hours, minutes] = formData.time.split(':').map(Number);
+    if (authMode === 'register') {
+      const newUser: UserType = { id: crypto.randomUUID(), name, email, role: 'client' };
+      storageService.registerUser(newUser);
+      storageService.setCurrentUser(newUser);
+      setUser(newUser);
+    } else {
+      const users = storageService.getUsers();
+      const found = users.find(u => u.email === email);
+      if (found) {
+        storageService.setCurrentUser(found);
+        setUser(found);
+      } else {
+        alert('Usuário não encontrado. Por favor, cadastre-se.');
+        setAuthMode('register');
+        return;
+      }
+    }
+    setIsAuthModalOpen(false);
+  };
+
+  const handleFinalizeBooking = () => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    const [hours, minutes] = selectedTime.split(':').map(Number);
     const appointmentDate = new Date(selectedDate);
     appointmentDate.setHours(hours, minutes, 0, 0);
 
     const newAppointment: Appointment = {
       id: crypto.randomUUID(),
-      clientName: formData.clientName,
-      service: service.name,
+      clientName: user.name,
+      clientId: user.id,
+      barberId: selectedBarber!.id,
+      serviceId: selectedService!.id,
+      serviceName: selectedService!.name,
       date: appointmentDate.toISOString(),
-      duration: service.duration,
+      duration: selectedService!.duration,
       status: 'confirmed',
-      notes: formData.notes
+      paymentMethod: paymentMethod as Appointment['paymentMethod']
     };
 
     storageService.saveAppointment(newAppointment);
-    setAppointments(storageService.getAppointments());
-    setIsModalOpen(false);
-    setFormData({ clientName: '', serviceId: services[0]?.id || '', time: '09:00', notes: '' });
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm('Deseja realmente excluir este agendamento?')) {
-      storageService.deleteAppointment(id);
-      setAppointments(storageService.getAppointments());
-    }
+    alert('Agendamento realizado com sucesso!');
+    setView('landing');
+    setStep(1);
+    setSelectedService(null);
+    setSelectedBarber(null);
+    setSelectedTime('');
   };
 
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-white selection:text-black font-sans">
-      {/* Header */}
-      <header className="border-b border-white/10 sticky top-0 bg-black/80 backdrop-blur-md z-30">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-bold text-xl tracking-tighter">
-            <Scissors className="w-5 h-5" />
-            <span>BarberFlow <span className="text-gray-500 font-medium">Agenda</span></span>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="bg-white text-black px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-gray-200 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Novo Agendamento
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-black text-white selection:bg-white selection:text-black font-sans scroll-smooth">
+      <Navbar user={user} onLogout={handleLogout} onOpenAuth={() => setIsAuthModalOpen(true)} />
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Calendar Controls */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight mb-1">
-              {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
-            </h1>
-            <div className="flex items-center gap-2">
-              <p className="text-gray-500">Gerencie seus horários e clientes para hoje.</p>
-              {filteredAppointments.length > 0 && (
-                <span className="bg-white/10 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  {filteredAppointments.length} {filteredAppointments.length === 1 ? 'Agendamento' : 'Agendamentos'}
-                </span>
-              )}
+      {view === 'landing' ? (
+        <>
+          {/* Hero Section */}
+          <section className="relative h-[90vh] flex items-center justify-center overflow-hidden">
+            <div className="absolute inset-0 z-0">
+              <img 
+                src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=2000" 
+                className="w-full h-full object-cover opacity-40 grayscale"
+                alt="Barbershop"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
             </div>
-          </div>
-
-          <div className="flex items-center bg-white/5 border border-white/10 rounded-lg p-1">
-            <button onClick={handlePrevDay} className="p-2 hover:bg-white/5 rounded-md transition-colors">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button 
-              onClick={handleToday}
-              className="px-4 py-1 text-sm font-medium hover:bg-white/5 rounded-md transition-colors"
-            >
-              Hoje
-            </button>
-            <button onClick={handleNextDay} className="p-2 hover:bg-white/5 rounded-md transition-colors">
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Timeline View */}
-        <div className="relative border border-white/10 rounded-2xl bg-white/[0.02] overflow-hidden">
-          <div className="grid grid-cols-[80px_1fr]">
-            {/* Time Column */}
-            <div className="border-r border-white/10 py-4">
-              {HOURS.map(hour => (
-                <div key={hour} className="h-24 px-4 text-right">
-                  <span className="text-xs font-mono text-gray-500">{hour.toString().padStart(2, '0')}:00</span>
-                </div>
-              ))}
+            
+            <div className="relative z-10 text-center max-w-4xl px-6">
+              <motion.h1 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-7xl md:text-9xl font-bold tracking-tighter mb-8"
+              >
+                ESTILO É <br /> <span className="text-gray-500">IDENTIDADE.</span>
+              </motion.h1>
+              <motion.p 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto"
+              >
+                A BarberFlow une a tradição da barbearia clássica com a conveniência moderna. Agende seu horário em segundos.
+              </motion.p>
+              <motion.button 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                onClick={() => setView('booking')}
+                className="bg-white text-black px-12 py-5 rounded-full text-lg font-bold hover:scale-105 transition-all shadow-2xl shadow-white/10"
+              >
+                Agendar Agora
+              </motion.button>
             </div>
+          </section>
 
-            {/* Slots Column */}
-            <div className="relative py-4">
-              {/* Grid Lines */}
-              {HOURS.map(hour => (
-                <div key={hour} className="h-24 border-b border-white/[0.05] last:border-0" />
-              ))}
-
-              {/* Appointments Layer */}
-              <div className="absolute inset-0 pointer-events-none">
-                {/* Current Time Indicator */}
-                {isSameDay(selectedDate, new Date()) && (
-                  <div 
-                    className="absolute left-0 right-0 border-t-2 border-red-500 z-20 flex items-center"
-                    style={{ 
-                      top: ((new Date().getHours() - 8) * 96) + (new Date().getMinutes() * 96 / 60) + 16 
-                    }}
-                  >
-                    <div className="w-2 h-2 bg-red-500 rounded-full -ml-1" />
-                  </div>
-                )}
-
-                {filteredAppointments.length === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
-                    <div className="text-center">
-                      <CalendarIcon className="w-12 h-12 mx-auto mb-4" />
-                      <p className="text-sm">Nenhum agendamento para este dia.</p>
-                    </div>
-                  </div>
-                )}
-
-                {filteredAppointments.map(app => {
-                  const date = parseISO(app.date);
-                  const startHour = date.getHours();
-                  const startMinutes = date.getMinutes();
-                  
-                  // Calculate position
-                  // 8:00 is the start (0px)
-                  // Each hour is 96px (24 * 4)
-                  const top = ((startHour - 8) * 96) + (startMinutes * 96 / 60) + 16;
-                  const height = (app.duration * 96 / 60);
-
-                  return (
-                    <motion.div
-                      key={app.id}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      style={{ top, height }}
-                      className="absolute left-4 right-4 bg-white text-black rounded-lg p-3 shadow-xl pointer-events-auto border border-black/5 flex flex-col justify-between group"
-                    >
-                      <div>
-                        <div className="flex justify-between items-start">
-                          <h3 className="font-bold text-sm leading-tight truncate">{app.clientName}</h3>
-                          <button 
-                            onClick={() => handleDelete(app.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/5 rounded transition-all"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-red-600" />
-                          </button>
-                        </div>
-                        <p className="text-[10px] font-medium uppercase tracking-wider opacity-60 mt-0.5">{app.service}</p>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-[10px] font-mono opacity-50">
-                        <Clock className="w-3 h-3" />
-                        {format(date, 'HH:mm')} - {format(addMinutes(date, app.duration), 'HH:mm')}
-                      </div>
-                    </motion.div>
-                  );
-                })}
+          {/* Services Grid */}
+          <section id="services" className="py-32 max-w-7xl mx-auto px-6">
+            <div className="flex items-end justify-between mb-16">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-[0.3em] text-gray-500 mb-4 block">Nossos Serviços</span>
+                <h2 className="text-5xl font-bold tracking-tight">Cortes & Cuidados</h2>
               </div>
             </div>
-          </div>
-        </div>
-      </main>
 
-      {/* Modal */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {services.map((s, idx) => (
+                <motion.div 
+                  key={s.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="group cursor-pointer"
+                  onClick={() => { setSelectedService(s); setView('booking'); setStep(2); }}
+                >
+                  <div className="relative aspect-[4/5] rounded-2xl overflow-hidden mb-6">
+                    <img src={s.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={s.name} />
+                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+                    <div className="absolute bottom-6 left-6">
+                      <span className="bg-white text-black px-3 py-1 rounded-full text-xs font-bold">R$ {s.price}</span>
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">{s.name}</h3>
+                  <p className="text-gray-500 text-sm">{s.description}</p>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          {/* Barbers Section */}
+          <section id="barbers" className="py-32 bg-white/[0.02] border-y border-white/5">
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="text-center mb-20">
+                <span className="text-xs font-bold uppercase tracking-[0.3em] text-gray-500 mb-4 block">A Equipe</span>
+                <h2 className="text-5xl font-bold tracking-tight">Mestres da Tesoura</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+                {barbers.map((b, idx) => (
+                  <motion.div 
+                    key={b.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="flex flex-col items-center text-center"
+                  >
+                    <div className="w-48 h-48 rounded-full overflow-hidden mb-8 border-4 border-white/10 p-2">
+                      <img src={b.avatarUrl} className="w-full h-full object-cover rounded-full grayscale hover:grayscale-0 transition-all duration-500" alt={b.name} />
+                    </div>
+                    <h3 className="text-2xl font-bold mb-1">{b.name}</h3>
+                    <p className="text-gray-500 font-medium mb-4">{b.role}</p>
+                    <div className="flex items-center gap-1 text-yellow-500 mb-4">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star key={i} className={`w-4 h-4 ${i < Math.floor(b.rating) ? 'fill-current' : ''}`} />
+                      ))}
+                      <span className="text-white text-sm font-bold ml-2">{b.rating}</span>
+                    </div>
+                    <p className="text-gray-400 text-sm max-w-xs">{b.bio}</p>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </>
+      ) : (
+        /* Booking Flow */
+        <main className="max-w-4xl mx-auto px-6 py-20">
+          <button 
+            onClick={() => step === 1 ? setView('landing') : setStep(step - 1)}
+            className="flex items-center gap-2 text-gray-500 hover:text-white mb-12 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar
+          </button>
+
+          <StepIndicator currentStep={step} />
+
+          <AnimatePresence mode="wait">
+            {step === 1 && (
+              <motion.div 
+                key="step1"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+              >
+                <h2 className="text-4xl font-bold mb-8 tracking-tight">Escolha o Serviço</h2>
+                <div className="grid grid-cols-1 gap-4">
+                  {services.map(s => (
+                    <button 
+                      key={s.id}
+                      onClick={() => { setSelectedService(s); setStep(2); }}
+                      className={`flex items-center justify-between p-6 rounded-2xl border transition-all ${
+                        selectedService?.id === s.id ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-6">
+                        <img src={s.imageUrl} className="w-16 h-16 rounded-xl object-cover" alt={s.name} />
+                        <div className="text-left">
+                          <h3 className="font-bold text-lg">{s.name}</h3>
+                          <p className={`text-sm ${selectedService?.id === s.id ? 'text-black/60' : 'text-gray-500'}`}>{s.duration} min</p>
+                        </div>
+                      </div>
+                      <span className="font-bold">R$ {s.price}</span>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {step === 2 && (
+              <motion.div 
+                key="step2"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+              >
+                <h2 className="text-4xl font-bold mb-8 tracking-tight">Escolha o Barbeiro</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {barbers.map(b => (
+                    <button 
+                      key={b.id}
+                      onClick={() => { setSelectedBarber(b); setStep(3); }}
+                      className={`p-8 rounded-2xl border transition-all flex flex-col items-center text-center ${
+                        selectedBarber?.id === b.id ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      <img src={b.avatarUrl} className="w-24 h-24 rounded-full mb-4 object-cover" alt={b.name} />
+                      <h3 className="font-bold text-lg">{b.name}</h3>
+                      <p className={`text-xs uppercase tracking-widest font-bold mb-2 ${selectedBarber?.id === b.id ? 'text-black/60' : 'text-gray-500'}`}>{b.role}</p>
+                      <div className="flex items-center gap-1 text-yellow-500">
+                        <Star className="w-3 h-3 fill-current" />
+                        <span className={`text-xs font-bold ${selectedBarber?.id === b.id ? 'text-black' : 'text-white'}`}>{b.rating}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {step === 3 && (
+              <motion.div 
+                key="step3"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+              >
+                <h2 className="text-4xl font-bold mb-8 tracking-tight">Data & Horário</h2>
+                
+                <div className="flex gap-4 mb-12 overflow-x-auto pb-4 scrollbar-hide">
+                  {Array.from({ length: 7 }).map((_, i) => {
+                    const date = addDays(new Date(), i);
+                    const isSelected = isSameDay(selectedDate, date);
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedDate(date)}
+                        className={`flex-shrink-0 w-24 py-6 rounded-2xl border flex flex-col items-center transition-all ${
+                          isSelected ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:border-white/30'
+                        }`}
+                      >
+                        <span className="text-[10px] uppercase font-bold tracking-widest mb-1">{format(date, 'EEE', { locale: ptBR })}</span>
+                        <span className="text-2xl font-bold">{format(date, 'dd')}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                  {['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'].map(time => (
+                    <button
+                      key={time}
+                      onClick={() => { setSelectedTime(time); setStep(4); }}
+                      className={`py-4 rounded-xl border text-sm font-bold transition-all ${
+                        selectedTime === time ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      {time}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {step === 4 && (
+              <motion.div 
+                key="step4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+              >
+                <h2 className="text-4xl font-bold mb-8 tracking-tight">Pagamento</h2>
+                
+                <div className="grid grid-cols-1 gap-4 mb-12">
+                  {[
+                    { id: 'pix', name: 'PIX', icon: CreditCard },
+                    { id: 'credit_card', name: 'Cartão de Crédito', icon: CreditCard },
+                    { id: 'debit_card', name: 'Cartão de Débito', icon: CreditCard },
+                    { id: 'cash', name: 'Dinheiro (na barbearia)', icon: CreditCard },
+                  ].map(method => (
+                    <button
+                      key={method.id}
+                      onClick={() => setPaymentMethod(method.id as any)}
+                      className={`flex items-center gap-4 p-6 rounded-2xl border transition-all ${
+                        paymentMethod === method.id ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      <method.icon className="w-6 h-6" />
+                      <span className="font-bold">{method.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-6">Resumo do Agendamento</h3>
+                  <div className="space-y-4 mb-8">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Serviço</span>
+                      <span className="font-bold">{selectedService?.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Barbeiro</span>
+                      <span className="font-bold">{selectedBarber?.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Data & Hora</span>
+                      <span className="font-bold">{format(selectedDate, 'dd/MM')} às {selectedTime}</span>
+                    </div>
+                    <div className="h-[1px] bg-white/10" />
+                    <div className="flex justify-between text-xl">
+                      <span className="font-bold">Total</span>
+                      <span className="font-bold text-white">R$ {selectedService?.price}</span>
+                    </div>
+                  </div>
+
+                  <button 
+                    disabled={!paymentMethod}
+                    onClick={handleFinalizeBooking}
+                    className="w-full bg-white text-black py-5 rounded-2xl text-lg font-bold hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Finalizar Agendamento
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
+      )}
+
+      {/* Auth Modal */}
       <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+        {isAuthModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setIsAuthModalOpen(false)}
+              className="absolute inset-0 bg-black/90 backdrop-blur-md"
             />
-            
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-gray-900 border border-white/10 rounded-2xl p-8 shadow-2xl"
+              className="relative w-full max-w-md bg-gray-900 border border-white/10 rounded-3xl p-10 shadow-2xl"
             >
-              <h2 className="text-2xl font-bold tracking-tight mb-6">Novo Agendamento</h2>
-              
-              <form onSubmit={handleAddAppointment} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 uppercase tracking-widest mb-1.5">Cliente</label>
-                  <input 
-                    required
-                    type="text" 
-                    placeholder="Nome do cliente"
-                    value={formData.clientName}
-                    onChange={e => setFormData({...formData, clientName: e.target.value})}
-                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:border-white/40 outline-none transition-all"
-                  />
-                </div>
+              <button 
+                onClick={() => setIsAuthModalOpen(false)}
+                className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
 
-                <div className="grid grid-cols-2 gap-4">
+              <h2 className="text-3xl font-bold tracking-tight mb-2">
+                {authMode === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}
+              </h2>
+              <p className="text-gray-500 mb-8">
+                {authMode === 'login' ? 'Entre para gerenciar seus agendamentos.' : 'Cadastre-se para agendar seu horário.'}
+              </p>
+
+              <form onSubmit={handleAuth} className="space-y-4">
+                {authMode === 'register' && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 uppercase tracking-widest mb-1.5">Serviço</label>
-                    <select 
-                      value={formData.serviceId}
-                      onChange={e => setFormData({...formData, serviceId: e.target.value})}
-                      className="w-full bg-black border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:border-white/40 outline-none transition-all appearance-none"
-                    >
-                      {services.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Nome Completo</label>
+                    <input name="name" required type="text" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40 transition-all" />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 uppercase tracking-widest mb-1.5">Horário</label>
-                    <input 
-                      required
-                      type="time" 
-                      value={formData.time}
-                      onChange={e => setFormData({...formData, time: e.target.value})}
-                      className="w-full bg-black border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:border-white/40 outline-none transition-all"
-                    />
-                  </div>
-                </div>
-
+                )}
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 uppercase tracking-widest mb-1.5">Notas (Opcional)</label>
-                  <textarea 
-                    rows={3}
-                    placeholder="Alguma observação..."
-                    value={formData.notes}
-                    onChange={e => setFormData({...formData, notes: e.target.value})}
-                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:border-white/40 outline-none transition-all resize-none"
-                  />
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">E-mail</label>
+                  <input name="email" required type="email" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40 transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Senha</label>
+                  <input name="password" required type="password" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40 transition-all" />
                 </div>
 
-                <div className="pt-4 flex gap-3">
-                  <button 
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 bg-white/5 text-white border border-white/10 py-2.5 rounded-lg text-sm font-medium hover:bg-white/10 transition-all"
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    type="submit"
-                    className="flex-1 bg-white text-black py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition-all"
-                  >
-                    Confirmar
-                  </button>
-                </div>
+                <button type="submit" className="w-full bg-white text-black py-4 rounded-xl font-bold mt-4 hover:bg-gray-200 transition-all">
+                  {authMode === 'login' ? 'Entrar' : 'Cadastrar'}
+                </button>
               </form>
+
+              <div className="mt-8 text-center text-sm">
+                <span className="text-gray-500">
+                  {authMode === 'login' ? 'Não tem uma conta?' : 'Já tem uma conta?'}
+                </span>
+                <button 
+                  onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                  className="ml-2 text-white font-bold hover:underline"
+                >
+                  {authMode === 'login' ? 'Cadastre-se' : 'Faça login'}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-20 bg-black">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12">
+          <div className="col-span-2">
+            <div className="flex items-center gap-2 font-bold text-2xl tracking-tighter mb-6">
+              <Scissors className="w-6 h-6" />
+              <span>BarberFlow</span>
+            </div>
+            <p className="text-gray-500 max-w-sm">
+              Mais que um corte, uma experiência de autocuidado e estilo. Agende seu horário e transforme seu visual.
+            </p>
+          </div>
+          <div>
+            <h4 className="font-bold mb-6">Links</h4>
+            <ul className="space-y-4 text-sm text-gray-500">
+              <li><a href="#" className="hover:text-white transition-colors">Início</a></li>
+              <li><a href="#services" className="hover:text-white transition-colors">Serviços</a></li>
+              <li><a href="#barbers" className="hover:text-white transition-colors">Barbeiros</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-bold mb-6">Contato</h4>
+            <ul className="space-y-4 text-sm text-gray-500">
+              <li>Rua da Barbearia, 123</li>
+              <li>(11) 99999-9999</li>
+              <li>contato@barberflow.com</li>
+            </ul>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-6 mt-20 pt-8 border-t border-white/5 text-center text-[10px] text-gray-600 uppercase tracking-widest">
+          © 2026 BarberFlow. Todos os direitos reservados.
+        </div>
+      </footer>
     </div>
   );
 }
