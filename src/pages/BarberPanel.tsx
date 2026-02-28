@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { Calendar, Clock, History, Plus } from 'lucide-react';
 import { Appointment, Availability, Barber } from '../types';
 import { storageService } from '../services/storage';

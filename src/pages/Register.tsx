@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { UserPlus, Scissors } from 'lucide-react';
 import { storageService } from '../services/storage';
 
@@ -17,7 +17,7 @@ export default function Register() {
     e.preventDefault();
     setError('');
     try {
-      const user = await storageService.register({ email, password, username });
+      const user = await storageService.register({ email, password, username, role: 'customer' });
       login(user);
       navigate('/');
     } catch (err) {

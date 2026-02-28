@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { Haircut, Barber, Availability } from '../types';
 import { Scissors, User, Calendar, CreditCard, Banknote, QrCode, CheckCircle2, ChevronRight } from 'lucide-react';

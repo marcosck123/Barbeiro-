@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { Plus, Image as ImageIcon, Trash2, TrendingUp, Users, Scissors, Wand2 } from 'lucide-react';
 import { Haircut, User, Barber } from '../types';
 import { editHaircutImage } from '../services/gemini';

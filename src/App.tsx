@@ -12,7 +12,7 @@ export default function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="min-h-screen bg-black text-white selection:bg-white selection:text-black">
+        <div className="min-h-screen bg-dark text-white selection:bg-white selection:text-black">
           <Navbar />
           <main>
             <Routes>

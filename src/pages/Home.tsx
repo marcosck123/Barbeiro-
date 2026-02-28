@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { Haircut } from '../types';
 import { Scissors, Clock, DollarSign, ChevronRight, Star, ShieldCheck, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';

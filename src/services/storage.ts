@@ -55,8 +55,13 @@ const INITIAL_USERS: User[] = [
 
 // Helper to get data from localStorage
 const get = <T>(key: string, defaultValue: T): T => {
-  const saved = localStorage.getItem(key);
-  return saved ? JSON.parse(saved) : defaultValue;
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : defaultValue;
+  } catch (e) {
+    console.error(`Error reading ${key} from localStorage:`, e);
+    return defaultValue;
+  }
 };
 
 // Helper to save data to localStorage
@@ -66,22 +71,25 @@ const save = <T>(key: string, data: T): void => {
 
 // Initialize Storage
 export const initStorage = () => {
-  if (!localStorage.getItem(STORAGE_KEYS.HAIRCUTS)) {
-    save(STORAGE_KEYS.HAIRCUTS, INITIAL_HAIRCUTS);
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-    save(STORAGE_KEYS.USERS, INITIAL_USERS);
-    // Add a default password for the admin in a real app, here we just mock it
-    localStorage.setItem('admin_password', '123456');
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.BARBERS)) {
-    save(STORAGE_KEYS.BARBERS, []);
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.AVAILABILITY)) {
-    save(STORAGE_KEYS.AVAILABILITY, []);
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.APPOINTMENTS)) {
-    save(STORAGE_KEYS.APPOINTMENTS, []);
+  try {
+    if (!localStorage.getItem(STORAGE_KEYS.HAIRCUTS)) {
+      save(STORAGE_KEYS.HAIRCUTS, INITIAL_HAIRCUTS);
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
+      save(STORAGE_KEYS.USERS, INITIAL_USERS);
+      localStorage.setItem('admin_password', '123456');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.BARBERS)) {
+      save(STORAGE_KEYS.BARBERS, []);
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.AVAILABILITY)) {
+      save(STORAGE_KEYS.AVAILABILITY, []);
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.APPOINTMENTS)) {
+      save(STORAGE_KEYS.APPOINTMENTS, []);
+    }
+  } catch (e) {
+    console.error('Error initializing storage:', e);
   }
 };
 
