@@ -56,6 +56,7 @@ const INITIAL_USERS: User[] = [
 // Helper to get data from localStorage
 const get = <T>(key: string, defaultValue: T): T => {
   try {
+    if (typeof localStorage === 'undefined') return defaultValue;
     const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : defaultValue;
   } catch (e) {
@@ -66,12 +67,19 @@ const get = <T>(key: string, defaultValue: T): T => {
 
 // Helper to save data to localStorage
 const save = <T>(key: string, data: T): void => {
-  localStorage.setItem(key, JSON.stringify(data));
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch (e) {
+    console.error(`Error saving ${key} to localStorage:`, e);
+  }
 };
 
 // Initialize Storage
 export const initStorage = () => {
   try {
+    if (typeof localStorage === 'undefined') return;
     if (!localStorage.getItem(STORAGE_KEYS.HAIRCUTS)) {
       save(STORAGE_KEYS.HAIRCUTS, INITIAL_HAIRCUTS);
     }
@@ -99,7 +107,14 @@ export const storageService = {
     const users = get<User[]>(STORAGE_KEYS.USERS, []);
     const user = users.find(u => u.email === email);
     // In this mock, we check a simple password store or just allow it for the admin
-    const savedPassword = email === 'marcoseduardock@gmail.com' ? '123456' : localStorage.getItem(`pass_${email}`);
+    let savedPassword = null;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        savedPassword = email === 'marcoseduardock@gmail.com' ? '123456' : localStorage.getItem(`pass_${email}`);
+      }
+    } catch (e) {
+      console.error('Error reading password from localStorage:', e);
+    }
     if (user && savedPassword === password) {
       return user;
     }
@@ -115,8 +130,12 @@ export const storageService = {
     };
     users.push(newUser);
     save(STORAGE_KEYS.USERS, users);
-    if (userData.password) {
-      localStorage.setItem(`pass_${userData.email}`, userData.password);
+    if (userData.password && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(`pass_${userData.email}`, userData.password);
+      } catch (e) {
+        console.error('Error saving password to localStorage:', e);
+      }
     }
     return newUser;
   },
