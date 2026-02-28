@@ -3,14 +3,13 @@ import { motion } from 'motion/react';
 import { Haircut } from '../types';
 import { Scissors, Clock, DollarSign, ChevronRight, Star, ShieldCheck, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { storageService } from '../services/storage';
 
 export default function Home() {
   const [haircuts, setHaircuts] = useState<Haircut[]>([]);
 
   useEffect(() => {
-    fetch('/api/haircuts')
-      .then(res => res.json())
-      .then(setHaircuts);
+    storageService.getHaircuts().then(setHaircuts);
   }, []);
 
   return (

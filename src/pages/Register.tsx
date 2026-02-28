@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { UserPlus, Scissors } from 'lucide-react';
+import { storageService } from '../services/storage';
 
 export default function Register() {
   const [email, setEmail] = useState('');
@@ -14,17 +15,13 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, username }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      login(data);
+    setError('');
+    try {
+      const user = await storageService.register({ email, password, username });
+      login(user);
       navigate('/');
-    } else {
-      setError(data.error);
+    } catch (err) {
+      setError('Erro ao criar conta');
     }
   };
 

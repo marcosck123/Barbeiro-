@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { Calendar, Clock, History, Plus } from 'lucide-react';
 import { Appointment, Availability, Barber } from '../types';
+import { storageService } from '../services/storage';
 
 export default function BarberPanel() {
   const { user } = useAuth();
@@ -13,48 +14,36 @@ export default function BarberPanel() {
 
   useEffect(() => {
     if (user) {
-      fetch('/api/barbers')
-        .then(res => res.json())
-        .then(barbers => {
-          const b = barbers.find((bar: any) => bar.user_id === user.id);
-          if (b) {
-            setBarber(b);
-            fetchAvailability(b.id);
-            fetchHistory(b.id);
-          }
-        });
+      storageService.getBarbers().then(barbers => {
+        const b = barbers.find((bar: any) => bar.user_id === user.id);
+        if (b) {
+          setBarber(b);
+          fetchAvailability(b.id);
+          fetchHistory(b.id);
+        }
+      });
     }
   }, [user]);
 
   const fetchAvailability = (id: number) => {
-    fetch(`/api/availability/${id}`)
-      .then(res => res.json())
-      .then(setAvailability);
+    storageService.getAvailability(id).then(setAvailability);
   };
 
   const fetchHistory = (id: number) => {
-    fetch(`/api/appointments/history/${id}`)
-      .then(res => res.json())
-      .then(setHistory);
+    storageService.getBarberHistory(id).then(setHistory);
   };
 
   const handleAddSlot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!barber) return;
     const start = `${newSlot.date}T${newSlot.time}:00`;
-    const res = await fetch('/api/availability', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        barber_id: barber.id,
-        start_time: start,
-        end_time: start // Simplified for now
-      })
+    await storageService.addAvailability({
+      barber_id: barber.id,
+      start_time: start,
+      end_time: start // Simplified for now
     });
-    if (res.ok) {
-      setNewSlot({ date: '', time: '' });
-      fetchAvailability(barber.id);
-    }
+    setNewSlot({ date: '', time: '' });
+    fetchAvailability(barber.id);
   };
 
   if (!barber) return (

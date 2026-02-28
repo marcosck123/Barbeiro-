@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { LogIn, UserPlus, Scissors } from 'lucide-react';
+import { storageService } from '../services/storage';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -13,17 +14,17 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      login(data);
-      navigate('/');
-    } else {
-      setError(data.error);
+    setError('');
+    try {
+      const user = await storageService.login(email, password);
+      if (user) {
+        login(user);
+        navigate(user.role === 'admin' ? '/admin' : user.role === 'barber' ? '/barber' : '/');
+      } else {
+        setError('Credenciais inválidas');
+      }
+    } catch (err) {
+      setError('Erro ao fazer login');
     }
   };
 

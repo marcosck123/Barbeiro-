@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { Haircut, Barber, Availability } from '../types';
 import { Scissors, User, Calendar, CreditCard, Banknote, QrCode, CheckCircle2, ChevronRight } from 'lucide-react';
+import { storageService } from '../services/storage';
 
 export default function Booking() {
   const [searchParams] = useSearchParams();
@@ -24,7 +25,7 @@ export default function Booking() {
   const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
-    fetch('/api/haircuts').then(res => res.json()).then(data => {
+    storageService.getHaircuts().then(data => {
       setHaircuts(data);
       const cutId = searchParams.get('cut');
       if (cutId) {
@@ -35,14 +36,12 @@ export default function Booking() {
         }
       }
     });
-    fetch('/api/barbers').then(res => res.json()).then(setBarbers);
+    storageService.getBarbers().then(setBarbers);
   }, [searchParams]);
 
   useEffect(() => {
     if (selectedBarber) {
-      fetch(`/api/availability/${selectedBarber.id}`)
-        .then(res => res.json())
-        .then(setSlots);
+      storageService.getAvailability(selectedBarber.id).then(setSlots);
     }
   }, [selectedBarber]);
 
@@ -52,10 +51,8 @@ export default function Booking() {
     setIsProcessing(true);
     const change = paymentMethod === 'dinheiro' ? parseFloat(cashAmount) - selectedCut.price : 0;
 
-    const res = await fetch('/api/appointments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      await storageService.createAppointment({
         customer_id: user.id,
         barber_id: selectedBarber.id,
         haircut_id: selectedCut.id,
@@ -64,12 +61,11 @@ export default function Booking() {
         total_price: selectedCut.price,
         change_amount: change > 0 ? change : 0,
         slot_id: selectedSlot.id
-      })
-    });
-
-    if (res.ok) {
+      });
       setIsSuccess(true);
       setTimeout(() => navigate('/'), 3000);
+    } catch (err) {
+      console.error(err);
     }
     setIsProcessing(false);
   };

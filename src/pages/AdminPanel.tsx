@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Plus, Image as ImageIcon, Trash2, TrendingUp, Users, Scissors, Wand2 } from 'lucide-react';
 import { Haircut, User, Barber } from '../types';
 import { editHaircutImage } from '../services/gemini';
+import { storageService } from '../services/storage';
 
 export default function AdminPanel() {
   const [haircuts, setHaircuts] = useState<Haircut[]>([]);
@@ -23,27 +24,21 @@ export default function AdminPanel() {
   }, []);
 
   const fetchData = async () => {
-    const [hRes, rRes, bRes] = await Promise.all([
-      fetch('/api/haircuts'),
-      fetch('/api/admin/reports'),
-      fetch('/api/barbers')
+    const [haircuts, reports, barbers] = await Promise.all([
+      storageService.getHaircuts(),
+      storageService.getAdminReports(),
+      storageService.getBarbers()
     ]);
-    setHaircuts(await hRes.json());
-    setReports(await rRes.json());
-    setBarbers(await bRes.json());
+    setHaircuts(haircuts);
+    setReports(reports);
+    setBarbers(barbers);
   };
 
   const handleAddHaircut = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/haircuts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newHaircut)
-    });
-    if (res.ok) {
-      setNewHaircut({ name: '', description: '', price: 0, estimated_time: 30, image: '' });
-      fetchData();
-    }
+    await storageService.addHaircut(newHaircut);
+    setNewHaircut({ name: '', description: '', price: 0, estimated_time: 30, image: '' });
+    fetchData();
   };
 
   const handleAiEditImage = async () => {
@@ -212,20 +207,14 @@ export default function AdminPanel() {
                 e.preventDefault();
                 const form = e.target as HTMLFormElement;
                 const formData = new FormData(form);
-                const res = await fetch('/api/barbers', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    user_id: parseInt(formData.get('user_id') as string),
-                    name: formData.get('name'),
-                    bio: formData.get('bio'),
-                    commission_rate: parseFloat(formData.get('commission_rate') as string) / 100
-                  })
+                await storageService.addBarber({
+                  user_id: parseInt(formData.get('user_id') as string),
+                  name: formData.get('name') as string,
+                  bio: formData.get('bio') as string,
+                  commission_rate: parseFloat(formData.get('commission_rate') as string) / 100
                 });
-                if (res.ok) {
-                  form.reset();
-                  fetchData();
-                }
+                form.reset();
+                fetchData();
               }} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <input name="user_id" type="number" placeholder="ID do Usuário" className="input-vercel" required />
@@ -249,8 +238,7 @@ export default function AdminPanel() {
                   </div>
                   <button 
                     onClick={async () => {
-                      const res = await fetch(`/api/appointments/history/${b.id}`);
-                      const data = await res.json();
+                      const data = await storageService.getBarberHistory(b.id);
                       alert(`Histórico de ${b.name}:\n` + data.map((a: any) => `- ${a.haircut_name}: R$ ${a.total_price.toFixed(2)} (${new Date(a.start_time).toLocaleDateString()})`).join('\n'));
                     }}
                     className="text-[10px] text-gray-400 hover:text-white transition-colors"
