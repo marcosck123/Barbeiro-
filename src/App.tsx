@@ -52,7 +52,7 @@ const Navbar = ({ user, onLogout, onOpenAuth, onGoToDashboard, onGoHome }: {
         {user && (user.role === 'admin' || user.role === 'barber') && (
           <button onClick={onGoToDashboard} className="flex items-center gap-2 text-white hover:text-gray-300 transition-colors">
             <LayoutDashboard className="w-4 h-4" />
-            Dashboard
+            {user.role === 'admin' ? 'Painel ADM' : 'Dashboard'}
           </button>
         )}
       </div>
@@ -105,19 +105,25 @@ const StepIndicator = ({ currentStep }: { currentStep: number }) => {
 
 // --- Admin Dashboard ---
 
-const AdminDashboard = ({ appointments, barbers, services, onAddBarber, onUpdateBarber, onAddService, onDeleteService, onDeleteAppointment }: { 
+const AdminDashboard = ({ user, appointments, barbers, services, settings, onAddBarber, onUpdateBarber, onAddService, onDeleteService, onDeleteAppointment, onUpdateUser, onUpdateSettings }: { 
+  user: UserType,
   appointments: Appointment[], 
   barbers: Barber[], 
   services: Service[],
+  settings: any,
   onAddBarber: (barber: Barber, user: UserType) => void,
   onUpdateBarber: (barber: Barber) => void,
   onAddService: (service: Service) => void,
   onDeleteService: (id: string) => void,
-  onDeleteAppointment: (id: string) => void
+  onDeleteAppointment: (id: string) => void,
+  onUpdateUser: (user: UserType) => void,
+  onUpdateSettings: (settings: any) => void
 }) => {
   const [isAddingBarber, setIsAddingBarber] = useState(false);
   const [isAddingService, setIsAddingService] = useState(false);
-  const [activeTab, setActiveTab] = useState<'stats' | 'barbers' | 'services' | 'history'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'barbers' | 'services' | 'history' | 'profile' | 'settings'>('stats');
+  const [editedUser, setEditedUser] = useState(user);
+  const [editedSettings, setEditedSettings] = useState(settings);
   
   const stats = useMemo(() => {
     const now = new Date();
@@ -185,127 +191,327 @@ const AdminDashboard = ({ appointments, barbers, services, onAddBarber, onUpdate
           <h2 className="text-4xl font-bold tracking-tight">Painel Administrativo</h2>
           <p className="text-gray-500">Visão geral do faturamento e gestão da equipe.</p>
         </div>
-        <button 
-          onClick={() => setIsAddingBarber(true)}
-          className="bg-white text-black px-6 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 hover:bg-gray-200 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Barbeiro
-        </button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500">
-              <DollarSign className="w-6 h-6" />
-            </div>
-            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">Faturamento Mensal</span>
-          </div>
-          <div className="text-4xl font-bold">R$ {stats.totalRevenue.toLocaleString()}</div>
-          <div className="mt-2 text-xs text-emerald-500 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" />
-            +12% em relação ao mês anterior
-          </div>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-500">
-              <CalendarIcon className="w-6 h-6" />
-            </div>
-            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">Total de Atendimentos</span>
-          </div>
-          <div className="text-4xl font-bold">{stats.totalApps}</div>
-          <p className="mt-2 text-xs text-gray-500">Mês de {format(new Date(), 'MMMM', { locale: ptBR })}</p>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-purple-500/10 rounded-2xl text-purple-500">
-              <Users className="w-6 h-6" />
-            </div>
-            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">Equipe Ativa</span>
-          </div>
-          <div className="text-4xl font-bold">{barbers.length}</div>
-          <p className="mt-2 text-xs text-gray-500">Barbeiros cadastrados</p>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setIsAddingService(true)}
+            className="bg-white/10 text-white px-6 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 hover:bg-white/20 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Serviço
+          </button>
+          <button 
+            onClick={() => setIsAddingBarber(true)}
+            className="bg-white text-black px-6 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 hover:bg-gray-200 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Barbeiro
+          </button>
         </div>
       </div>
 
-      {/* Revenue Chart */}
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-        <h3 className="text-xl font-bold mb-8">Evolução do Faturamento</h3>
-        <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ffffff" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#ffffff" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-              <XAxis dataKey="name" stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value}`} />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: '12px' }}
-                itemStyle={{ color: '#fff' }}
-              />
-              <Area type="monotone" dataKey="revenue" stroke="#fff" fillOpacity={1} fill="url(#colorRev)" strokeWidth={3} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+      {/* Tabs */}
+      <div className="flex items-center gap-4 border-b border-white/10 overflow-x-auto pb-px scrollbar-hide">
+        {[
+          { id: 'stats', name: 'Estatísticas', icon: TrendingUp },
+          { id: 'barbers', name: 'Barbeiros', icon: Users },
+          { id: 'services', name: 'Serviços', icon: Scissors },
+          { id: 'history', name: 'Histórico', icon: CalendarIcon },
+          { id: 'profile', name: 'Meu Perfil', icon: UserIcon },
+          { id: 'settings', name: 'Configurações', icon: Settings },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-2 px-6 py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
+              activeTab === tab.id ? 'border-white text-white' : 'border-transparent text-gray-500 hover:text-white'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.name}
+          </button>
+        ))}
       </div>
 
-      {/* Barber Performance Table */}
-      <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
-        <div className="p-8 border-b border-white/10">
-          <h3 className="text-xl font-bold">Desempenho da Equipe</h3>
+      {activeTab === 'stats' && (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500">
+                  <DollarSign className="w-6 h-6" />
+                </div>
+                <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">Faturamento Mensal</span>
+              </div>
+              <div className="text-4xl font-bold">R$ {stats.totalRevenue.toLocaleString()}</div>
+              <div className="mt-2 text-xs text-emerald-500 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" />
+                +12% em relação ao mês anterior
+              </div>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-500">
+                  <CalendarIcon className="w-6 h-6" />
+                </div>
+                <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">Total de Atendimentos</span>
+              </div>
+              <div className="text-4xl font-bold">{stats.totalApps}</div>
+              <p className="mt-2 text-xs text-gray-500">Mês de {format(new Date(), 'MMMM', { locale: ptBR })}</p>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-purple-500/10 rounded-2xl text-purple-500">
+                  <Users className="w-6 h-6" />
+                </div>
+                <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">Equipe Ativa</span>
+              </div>
+              <div className="text-4xl font-bold">{barbers.length}</div>
+              <p className="mt-2 text-xs text-gray-500">Barbeiros cadastrados</p>
+            </div>
+          </div>
+
+          {/* Revenue Chart */}
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
+            <h3 className="text-xl font-bold mb-8">Evolução do Faturamento</h3>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ffffff" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#ffffff" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                  <XAxis dataKey="name" stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value}`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: '12px' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Area type="monotone" dataKey="revenue" stroke="#fff" fillOpacity={1} fill="url(#colorRev)" strokeWidth={3} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'barbers' && (
+        <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+          <div className="p-8 border-b border-white/10">
+            <h3 className="text-xl font-bold">Desempenho da Equipe</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] font-bold uppercase tracking-widest text-gray-500 border-b border-white/10">
+                  <th className="px-8 py-4">Barbeiro</th>
+                  <th className="px-8 py-4">Atendimentos</th>
+                  <th className="px-8 py-4">Faturamento</th>
+                  <th className="px-8 py-4">Comissão (%)</th>
+                  <th className="px-8 py-4">A Pagar</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {stats.barberStats.map((b, idx) => {
+                  const barber = barbers.find(bar => bar.name === b.name);
+                  return (
+                    <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-8 py-6 font-bold">{b.name}</td>
+                      <td className="px-8 py-6 text-gray-400">{b.apps}</td>
+                      <td className="px-8 py-6 text-gray-400">R$ {b.revenue.toLocaleString()}</td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="number" 
+                            defaultValue={barber?.commissionRate} 
+                            onBlur={(e) => {
+                              if (barber) {
+                                const newRate = Number(e.target.value);
+                                onUpdateBarber({ ...barber, commissionRate: newRate });
+                              }
+                            }}
+                            className="w-16 bg-white/10 border border-white/10 rounded px-2 py-1 text-xs font-mono outline-none focus:border-white/40"
+                          />
+                          <span className="text-xs text-gray-500">%</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 font-bold text-emerald-500">R$ {b.commission.toLocaleString()}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-[10px] font-bold uppercase tracking-widest text-gray-500 border-b border-white/10">
-                <th className="px-8 py-4">Barbeiro</th>
-                <th className="px-8 py-4">Atendimentos</th>
-                <th className="px-8 py-4">Faturamento</th>
-                <th className="px-8 py-4">Comissão (%)</th>
-                <th className="px-8 py-4">A Pagar</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {stats.barberStats.map((b, idx) => {
-                const barber = barbers.find(bar => bar.name === b.name);
-                return (
-                  <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-8 py-6 font-bold">{b.name}</td>
-                    <td className="px-8 py-6 text-gray-400">{b.apps}</td>
-                    <td className="px-8 py-6 text-gray-400">R$ {b.revenue.toLocaleString()}</td>
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-2">
-                        <input 
-                          type="number" 
-                          defaultValue={barber?.commissionRate} 
-                          onBlur={(e) => {
-                            if (barber) {
-                              const newRate = Number(e.target.value);
-                              onUpdateBarber({ ...barber, commissionRate: newRate });
-                            }
-                          }}
-                          className="w-16 bg-white/10 border border-white/10 rounded px-2 py-1 text-xs font-mono outline-none focus:border-white/40"
-                        />
-                        <span className="text-xs text-gray-500">%</span>
-                      </div>
+      )}
+
+      {activeTab === 'services' && (
+        <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+          <div className="p-8 border-b border-white/10 flex items-center justify-between">
+            <h3 className="text-xl font-bold">Gestão de Serviços</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] font-bold uppercase tracking-widest text-gray-500 border-b border-white/10">
+                  <th className="px-8 py-4">Serviço</th>
+                  <th className="px-8 py-4">Categoria</th>
+                  <th className="px-8 py-4">Duração</th>
+                  <th className="px-8 py-4 text-right">Preço</th>
+                  <th className="px-8 py-4 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {services.map(s => (
+                  <tr key={s.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="px-8 py-6 font-bold">{s.name}</td>
+                    <td className="px-8 py-6 text-gray-400">{s.category}</td>
+                    <td className="px-8 py-6 text-gray-400">{s.duration} min</td>
+                    <td className="px-8 py-6 text-right font-bold">R$ {s.price}</td>
+                    <td className="px-8 py-6 text-center">
+                      <button 
+                        onClick={() => onDeleteService(s.id)}
+                        className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
-                    <td className="px-8 py-6 font-bold text-emerald-500">R$ {b.commission.toLocaleString()}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+          <div className="p-8 border-b border-white/10 flex items-center justify-between">
+            <h3 className="text-xl font-bold">Histórico Geral de Atendimentos</h3>
+            <span className="text-xs text-gray-500 font-mono uppercase tracking-widest">{appointments.length} registros</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] font-bold uppercase tracking-widest text-gray-500 border-b border-white/10">
+                  <th className="px-8 py-4">Data</th>
+                  <th className="px-8 py-4">Cliente</th>
+                  <th className="px-8 py-4">Barbeiro</th>
+                  <th className="px-8 py-4">Serviço</th>
+                  <th className="px-8 py-4 text-right">Valor</th>
+                  <th className="px-8 py-4 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {[...appointments].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()).map(app => {
+                  const service = services.find(s => s.id === app.serviceId);
+                  const barber = barbers.find(b => b.id === app.barberId);
+                  return (
+                    <tr key={app.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-8 py-6 text-sm text-gray-400">{format(parseISO(app.date), 'dd/MM/yy HH:mm')}</td>
+                      <td className="px-8 py-6 font-bold">{app.clientName}</td>
+                      <td className="px-8 py-6 text-gray-400">{barber?.name}</td>
+                      <td className="px-8 py-6 text-gray-400">{app.serviceName}</td>
+                      <td className="px-8 py-6 text-right font-bold">R$ {service?.price}</td>
+                      <td className="px-8 py-6 text-center">
+                        <button 
+                          onClick={() => onDeleteAppointment(app.id)}
+                          className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'profile' && (
+        <div className="max-w-md bg-white/5 border border-white/10 rounded-3xl p-8 space-y-6">
+          <h3 className="text-xl font-bold mb-6">Editar Perfil</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Nome</label>
+              <input 
+                value={editedUser.name}
+                onChange={e => setEditedUser({...editedUser, name: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">E-mail</label>
+              <input 
+                value={editedUser.email}
+                onChange={e => setEditedUser({...editedUser, email: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Nova Senha</label>
+              <input 
+                type="password"
+                value={editedUser.password || ''}
+                onChange={e => setEditedUser({...editedUser, password: e.target.value})}
+                placeholder="Deixe em branco para manter a atual"
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+              />
+            </div>
+            <button 
+              onClick={() => onUpdateUser(editedUser)}
+              className="w-full bg-white text-black py-4 rounded-xl font-bold mt-4 hover:bg-gray-200"
+            >
+              Salvar Alterações
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'settings' && (
+        <div className="max-w-md bg-white/5 border border-white/10 rounded-3xl p-8 space-y-6">
+          <h3 className="text-xl font-bold mb-6">Configurações da Barbearia</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">WhatsApp para Contato</label>
+              <input 
+                value={editedSettings.whatsapp}
+                onChange={e => setEditedSettings({...editedSettings, whatsapp: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Endereço</label>
+              <input 
+                value={editedSettings.address}
+                onChange={e => setEditedSettings({...editedSettings, address: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Horário de Funcionamento</label>
+              <input 
+                value={editedSettings.openingHours}
+                onChange={e => setEditedSettings({...editedSettings, openingHours: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+              />
+            </div>
+            <button 
+              onClick={() => onUpdateSettings(editedSettings)}
+              className="w-full bg-white text-black py-4 rounded-xl font-bold mt-4 hover:bg-gray-200"
+            >
+              Salvar Configurações
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add Service Modal */}
       <AnimatePresence>
@@ -419,14 +625,17 @@ const AdminDashboard = ({ appointments, barbers, services, onAddBarber, onUpdate
 
 // --- Barber Dashboard ---
 
-const BarberDashboard = ({ barber, appointments, services, onUpdateProfile }: { 
+const BarberDashboard = ({ user, barber, appointments, services, onUpdateProfile, onUpdateUser }: { 
+  user: UserType,
   barber: Barber, 
   appointments: Appointment[], 
   services: Service[],
-  onUpdateProfile: (updatedBarber: Barber) => void
+  onUpdateProfile: (updatedBarber: Barber) => void,
+  onUpdateUser: (user: UserType) => void
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'stats' | 'history' | 'profile'>('stats');
   const [editedBarber, setEditedBarber] = useState(barber);
+  const [editedUser, setEditedUser] = useState(user);
 
   const myAppointments = useMemo(() => {
     return appointments.filter(app => app.barberId === barber.id)
@@ -448,48 +657,63 @@ const BarberDashboard = ({ barber, appointments, services, onUpdateProfile }: {
         <div className="flex items-center gap-6">
           <div className="relative group">
             <img src={barber.avatarUrl} className="w-24 h-24 rounded-full object-cover border-4 border-white/10" alt={barber.name} />
-            <button className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-full flex items-center justify-center transition-opacity">
-              <Camera className="w-6 h-6" />
-            </button>
           </div>
           <div>
             <h2 className="text-4xl font-bold tracking-tight">{barber.name}</h2>
             <p className="text-gray-500 font-medium">{barber.role}</p>
           </div>
         </div>
-        <button 
-          onClick={() => isEditing ? (onUpdateProfile(editedBarber), setIsEditing(false)) : setIsEditing(true)}
-          className="bg-white text-black px-8 py-3 rounded-full text-sm font-bold flex items-center gap-2 hover:bg-gray-200 transition-all"
-        >
-          {isEditing ? <><Save className="w-4 h-4" /> Salvar Perfil</> : <><Edit2 className="w-4 h-4" /> Editar Perfil</>}
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-          <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Minha Comissão</span>
-          <div className="text-4xl font-bold text-emerald-500">R$ {myStats.commission.toLocaleString()}</div>
-          <p className="mt-2 text-xs text-gray-500">Baseado em R$ {myStats.revenue.toLocaleString()} de faturamento</p>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-          <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Atendimentos</span>
-          <div className="text-4xl font-bold">{myStats.count}</div>
-          <p className="mt-2 text-xs text-gray-500">Total histórico</p>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-          <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Avaliação</span>
-          <div className="text-4xl font-bold flex items-center gap-2">
-            {barber.rating}
-            <Star className="w-6 h-6 fill-yellow-500 text-yellow-500" />
+      {/* Tabs */}
+      <div className="flex items-center gap-4 border-b border-white/10 overflow-x-auto pb-px scrollbar-hide">
+        {[
+          { id: 'stats', name: 'Visão Geral', icon: TrendingUp },
+          { id: 'history', name: 'Meus Atendimentos', icon: CalendarIcon },
+          { id: 'profile', name: 'Meu Perfil', icon: UserIcon },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-2 px-6 py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
+              activeTab === tab.id ? 'border-white text-white' : 'border-transparent text-gray-500 hover:text-white'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.name}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'stats' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Minha Comissão</span>
+            <div className="text-4xl font-bold text-emerald-500">R$ {myStats.commission.toLocaleString()}</div>
+            <p className="mt-2 text-xs text-gray-500">Baseado em R$ {myStats.revenue.toLocaleString()} de faturamento</p>
           </div>
-          <p className="mt-2 text-xs text-gray-500">Média dos clientes</p>
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Atendimentos</span>
+            <div className="text-4xl font-bold">{myStats.count}</div>
+            <p className="mt-2 text-xs text-gray-500">Total histórico</p>
+          </div>
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Avaliação</span>
+            <div className="text-4xl font-bold flex items-center gap-2">
+              {barber.rating}
+              <Star className="w-6 h-6 fill-yellow-500 text-yellow-500" />
+            </div>
+            <p className="mt-2 text-xs text-gray-500">Média dos clientes</p>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-2 space-y-8">
-          <h3 className="text-2xl font-bold">Histórico de Atendimentos</h3>
-          <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+      {activeTab === 'history' && (
+        <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+          <div className="p-8 border-b border-white/10">
+            <h3 className="text-xl font-bold">Histórico de Atendimentos</h3>
+          </div>
+          <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="text-[10px] font-bold uppercase tracking-widest text-gray-500 border-b border-white/10">
@@ -515,39 +739,78 @@ const BarberDashboard = ({ barber, appointments, services, onUpdateProfile }: {
             </table>
           </div>
         </div>
+      )}
 
-        <div className="space-y-8">
-          <h3 className="text-2xl font-bold">Meu Perfil</h3>
+      {activeTab === 'profile' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           <div className="bg-white/5 border border-white/10 rounded-3xl p-8 space-y-6">
-            {isEditing ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Biografia</label>
-                  <textarea 
-                    value={editedBarber.bio}
-                    onChange={e => setEditedBarber({...editedBarber, bio: e.target.value})}
-                    rows={6}
-                    className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40 resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Avatar URL</label>
-                  <input 
-                    value={editedBarber.avatarUrl}
-                    onChange={e => setEditedBarber({...editedBarber, avatarUrl: e.target.value})}
-                    className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40"
-                  />
-                </div>
-              </div>
-            ) : (
+            <h3 className="text-xl font-bold mb-6">Perfil Profissional</h3>
+            <div className="space-y-4">
               <div>
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-4">Biografia</span>
-                <p className="text-gray-400 leading-relaxed italic">"{barber.bio}"</p>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Biografia</label>
+                <textarea 
+                  value={editedBarber.bio}
+                  onChange={e => setEditedBarber({...editedBarber, bio: e.target.value})}
+                  rows={6}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40 resize-none"
+                />
               </div>
-            )}
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Avatar URL</label>
+                <input 
+                  value={editedBarber.avatarUrl}
+                  onChange={e => setEditedBarber({...editedBarber, avatarUrl: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40"
+                />
+              </div>
+              <button 
+                onClick={() => onUpdateProfile(editedBarber)}
+                className="w-full bg-white text-black py-4 rounded-xl font-bold mt-4 hover:bg-gray-200"
+              >
+                Salvar Perfil Profissional
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-8 space-y-6">
+            <h3 className="text-xl font-bold mb-6">Dados de Acesso</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Nome</label>
+                <input 
+                  value={editedUser.name}
+                  onChange={e => setEditedUser({...editedUser, name: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">E-mail</label>
+                <input 
+                  value={editedUser.email}
+                  onChange={e => setEditedUser({...editedUser, email: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Nova Senha</label>
+                <input 
+                  type="password"
+                  value={editedUser.password || ''}
+                  onChange={e => setEditedUser({...editedUser, password: e.target.value})}
+                  placeholder="Deixe em branco para manter a atual"
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+                />
+              </div>
+              <button 
+                onClick={() => onUpdateUser(editedUser)}
+                className="w-full bg-white text-black py-4 rounded-xl font-bold mt-4 hover:bg-gray-200"
+              >
+                Salvar Dados de Acesso
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -572,6 +835,7 @@ export default function App() {
   const [barbers, setBarbers] = useState<Barber[]>(storageService.getBarbers());
   const [appointments, setAppointments] = useState<Appointment[]>(storageService.getAppointments());
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const [settings, setSettings] = useState(storageService.getSettings());
 
   const categories = useMemo(() => {
     const cats = new Set(services.map(s => s.category));
@@ -904,9 +1168,11 @@ export default function App() {
         <main className="max-w-7xl mx-auto px-6 py-20">
           {user?.role === 'admin' ? (
             <AdminDashboard 
+              user={user}
               appointments={appointments} 
               barbers={barbers} 
               services={services}
+              settings={settings}
               onAddBarber={(b, u) => {
                 storageService.saveBarber(b);
                 storageService.registerUser(u);
@@ -928,15 +1194,34 @@ export default function App() {
                 storageService.deleteAppointment(id);
                 setAppointments(storageService.getAppointments());
               }}
+              onUpdateUser={(u) => {
+                storageService.saveUser(u);
+                storageService.setCurrentUser(u);
+                setUser(u);
+                alert('Perfil atualizado com sucesso!');
+              }}
+              onUpdateSettings={(s) => {
+                storageService.saveSettings(s);
+                setSettings(s);
+                alert('Configurações salvas!');
+              }}
             />
           ) : user?.role === 'barber' && currentBarberProfile ? (
             <BarberDashboard 
+              user={user}
               barber={currentBarberProfile} 
               appointments={appointments} 
               services={services}
               onUpdateProfile={(b) => {
                 storageService.saveBarber(b);
                 setBarbers(storageService.getBarbers());
+                alert('Perfil profissional atualizado!');
+              }}
+              onUpdateUser={(u) => {
+                storageService.saveUser(u);
+                storageService.setCurrentUser(u);
+                setUser(u);
+                alert('Dados de acesso atualizados!');
               }}
             />
           ) : (
@@ -1005,6 +1290,21 @@ export default function App() {
         </div>
         <div className="max-w-7xl mx-auto px-6 mt-20 pt-8 border-t border-white/5 text-center text-[10px] text-gray-600 uppercase tracking-widest">© 2026 BarberFlow. Todos os direitos reservados.</div>
       </footer>
+
+      {/* WhatsApp Button */}
+      <a 
+        href={`https://wa.me/${settings.whatsapp.replace(/\D/g, '')}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-8 right-8 z-[60] bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-all group"
+      >
+        <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+        </svg>
+        <span className="absolute right-full mr-4 bg-white text-black px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-xl">
+          Fale conosco
+        </span>
+      </a>
     </div>
   );
 }

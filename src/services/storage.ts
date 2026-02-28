@@ -6,6 +6,13 @@ const STORAGE_KEYS = {
   BARBERS: 'bf_barbers',
   USERS: 'bf_users',
   CURRENT_USER: 'bf_current_user',
+  SETTINGS: 'bf_settings',
+};
+
+const DEFAULT_SETTINGS = {
+  whatsapp: '(11) 99999-9999',
+  address: 'Rua da Barbearia, 123',
+  openingHours: '09:00 - 20:00'
 };
 
 const DEFAULT_SERVICES: Service[] = [
@@ -101,6 +108,14 @@ export const storageService = {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
   },
 
+  saveUser: (user: User) => {
+    const users = storageService.getUsers();
+    const index = users.findIndex(u => u.id === user.id);
+    if (index >= 0) users[index] = user;
+    else users.push(user);
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  },
+
   setCurrentUser: (user: User | null) => {
     if (user) localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
     else localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
@@ -110,5 +125,15 @@ export const storageService = {
     if (typeof localStorage === 'undefined') return null;
     const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     return data ? JSON.parse(data) : null;
+  },
+
+  getSettings: () => {
+    if (typeof localStorage === 'undefined') return DEFAULT_SETTINGS;
+    const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    return data ? JSON.parse(data) : DEFAULT_SETTINGS;
+  },
+
+  saveSettings: (settings: any) => {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }
 };
