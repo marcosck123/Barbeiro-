@@ -105,15 +105,19 @@ const StepIndicator = ({ currentStep }: { currentStep: number }) => {
 
 // --- Admin Dashboard ---
 
-const AdminDashboard = ({ appointments, barbers, services, onAddBarber, onUpdateBarber, onDeleteAppointment }: { 
+const AdminDashboard = ({ appointments, barbers, services, onAddBarber, onUpdateBarber, onAddService, onDeleteService, onDeleteAppointment }: { 
   appointments: Appointment[], 
   barbers: Barber[], 
   services: Service[],
   onAddBarber: (barber: Barber, user: UserType) => void,
   onUpdateBarber: (barber: Barber) => void,
+  onAddService: (service: Service) => void,
+  onDeleteService: (id: string) => void,
   onDeleteAppointment: (id: string) => void
 }) => {
   const [isAddingBarber, setIsAddingBarber] = useState(false);
+  const [isAddingService, setIsAddingService] = useState(false);
+  const [activeTab, setActiveTab] = useState<'stats' | 'barbers' | 'services' | 'history'>('stats');
   
   const stats = useMemo(() => {
     const now = new Date();
@@ -303,36 +307,27 @@ const AdminDashboard = ({ appointments, barbers, services, onAddBarber, onUpdate
         </div>
       </div>
 
-      {/* Add Barber Modal */}
+      {/* Add Service Modal */}
       <AnimatePresence>
-        {isAddingBarber && (
+        {isAddingService && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAddingBarber(false)} className="absolute inset-0 bg-black/90 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAddingService(false)} className="absolute inset-0 bg-black/90 backdrop-blur-md" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-md bg-gray-900 border border-white/10 rounded-3xl p-10 shadow-2xl">
-              <h2 className="text-3xl font-bold mb-6">Novo Barbeiro</h2>
+              <h2 className="text-3xl font-bold mb-6">Novo Serviço</h2>
               <form onSubmit={(e) => {
                 e.preventDefault();
                 const target = e.target as any;
-                const barberId = crypto.randomUUID();
-                const newBarber: Barber = {
-                  id: barberId,
-                  name: target.name.value,
-                  role: target.role.value,
-                  avatarUrl: `https://i.pravatar.cc/150?u=${barberId}`,
-                  bio: target.bio.value,
-                  rating: 5.0,
-                  commissionRate: Number(target.commission.value)
-                };
-                const newUser: UserType = {
+                const newService: Service = {
                   id: crypto.randomUUID(),
                   name: target.name.value,
-                  email: target.email.value,
-                  password: target.password.value,
-                  role: 'barber',
-                  barberId: barberId
+                  category: target.category.value,
+                  description: target.description.value,
+                  duration: Number(target.duration.value),
+                  price: Number(target.price.value),
+                  imageUrl: target.imageUrl.value || 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400&h=400&fit=crop'
                 };
-                onAddBarber(newBarber, newUser);
-                setIsAddingBarber(false);
+                onAddService(newService);
+                setIsAddingService(false);
               }} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -340,29 +335,34 @@ const AdminDashboard = ({ appointments, barbers, services, onAddBarber, onUpdate
                     <input name="name" required className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Cargo</label>
-                    <input name="role" required placeholder="Ex: Master Barber" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" />
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Categoria</label>
+                    <select name="category" required className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40">
+                      <option value="Cabelo">Cabelo</option>
+                      <option value="Barba">Barba</option>
+                      <option value="Combo">Combo</option>
+                      <option value="Outros">Outros</option>
+                    </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">E-mail de Acesso</label>
-                    <input name="email" type="email" required className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" />
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Duração (min)</label>
+                    <input name="duration" type="number" required defaultValue={30} className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Senha de Acesso</label>
-                    <input name="password" type="password" required defaultValue="123456" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" />
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Preço (R$)</label>
+                    <input name="price" type="number" required defaultValue={40} className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Comissão (%)</label>
-                  <input name="commission" type="number" required defaultValue={30} className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" />
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">URL da Imagem</label>
+                  <input name="imageUrl" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Bio</label>
-                  <textarea name="bio" rows={3} className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40 resize-none" />
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Descrição</label>
+                  <textarea name="description" rows={3} className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40 resize-none" />
                 </div>
-                <button type="submit" className="w-full bg-white text-black py-4 rounded-xl font-bold mt-4 hover:bg-gray-200">Salvar Barbeiro & Criar Conta</button>
+                <button type="submit" className="w-full bg-white text-black py-4 rounded-xl font-bold mt-4 hover:bg-gray-200">Salvar Serviço</button>
               </form>
             </motion.div>
           </div>
@@ -568,9 +568,20 @@ export default function App() {
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<Appointment['paymentMethod'] | ''>('');
 
-  const [services] = useState<Service[]>(storageService.getServices());
+  const [services, setServices] = useState<Service[]>(storageService.getServices());
   const [barbers, setBarbers] = useState<Barber[]>(storageService.getBarbers());
   const [appointments, setAppointments] = useState<Appointment[]>(storageService.getAppointments());
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+
+  const categories = useMemo(() => {
+    const cats = new Set(services.map(s => s.category));
+    return ['Todos', ...Array.from(cats)];
+  }, [services]);
+
+  const filteredServices = useMemo(() => {
+    if (selectedCategory === 'Todos') return services;
+    return services.filter(s => s.category === selectedCategory);
+  }, [services, selectedCategory]);
 
   useEffect(() => {
     setUser(storageService.getCurrentUser());
@@ -701,15 +712,29 @@ export default function App() {
 
           {/* Services Grid */}
           <section id="services" className="py-32 max-w-7xl mx-auto px-6">
-            <div className="flex items-end justify-between mb-16">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8">
               <div>
                 <span className="text-xs font-bold uppercase tracking-[0.3em] text-gray-500 mb-4 block">Nossos Serviços</span>
                 <h2 className="text-5xl font-bold tracking-tight">Cortes & Cuidados</h2>
               </div>
+              
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-6 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap ${
+                      selectedCategory === cat ? 'bg-white text-black' : 'bg-white/5 text-gray-500 hover:text-white'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {services.map((s, idx) => (
+              {filteredServices.map((s, idx) => (
                 <motion.div 
                   key={s.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -725,7 +750,10 @@ export default function App() {
                       <span className="bg-white text-black px-3 py-1 rounded-full text-xs font-bold">R$ {s.price}</span>
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">{s.name}</h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xl font-bold">{s.name}</h3>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-gray-500">{s.category}</span>
+                  </div>
                   <p className="text-gray-500 text-sm">{s.description}</p>
                 </motion.div>
               ))}
@@ -887,6 +915,14 @@ export default function App() {
               onUpdateBarber={(b) => {
                 storageService.saveBarber(b);
                 setBarbers(storageService.getBarbers());
+              }}
+              onAddService={(s) => {
+                storageService.saveService(s);
+                setServices(storageService.getServices());
+              }}
+              onDeleteService={(id) => {
+                storageService.deleteService(id);
+                setServices(storageService.getServices());
               }}
               onDeleteAppointment={(id) => {
                 storageService.deleteAppointment(id);

@@ -15,6 +15,7 @@ export interface Appointment {
 export interface Service {
   id: string;
   name: string;
+  category: string; // e.g., 'Cabelo', 'Barba', 'Combo'
   description: string;
   duration: number;
   price: number;
