@@ -21,7 +21,8 @@ import {
   Edit2,
   Save,
   Camera,
-  LayoutDashboard
+  LayoutDashboard,
+  ShoppingBag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, addDays, startOfDay, isSameDay, parseISO, addMinutes, startOfMonth, endOfMonth, isWithinInterval, subMonths } from 'date-fns';
@@ -38,45 +39,128 @@ const Navbar = ({ user, onLogout, onOpenAuth, onGoToDashboard, onGoHome }: {
   onOpenAuth: () => void,
   onGoToDashboard: () => void,
   onGoHome: () => void
-}) => (
-  <nav className="border-b border-white/10 sticky top-0 bg-black/80 backdrop-blur-md z-50">
-    <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-      <div className="flex items-center gap-2 font-bold text-2xl tracking-tighter cursor-pointer" onClick={onGoHome}>
-        <Scissors className="w-6 h-6 text-white" />
-        <span>BarberFlow</span>
-      </div>
-      
-      <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
-        <a href="#services" onClick={onGoHome} className="hover:text-white transition-colors">Serviços</a>
-        <a href="#barbers" onClick={onGoHome} className="hover:text-white transition-colors">Barbeiros</a>
-        {user && (user.role === 'admin' || user.role === 'barber') && (
-          <button onClick={onGoToDashboard} className="flex items-center gap-2 text-white hover:text-gray-300 transition-colors">
-            <LayoutDashboard className="w-4 h-4" />
-            {user.role === 'admin' ? 'Painel ADM' : 'Dashboard'}
+}) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const navLinks = [
+    { name: 'Página Inicial', href: '#', onClick: onGoHome },
+    { name: 'Serviços', href: '#services', onClick: onGoHome },
+    { name: 'Produtos', href: '#products', onClick: onGoHome },
+    { name: 'Barbeiros', href: '#barbers', onClick: onGoHome },
+  ];
+
+  return (
+    <nav className="border-b border-white/10 sticky top-0 bg-black/80 backdrop-blur-md z-50">
+      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="flex items-center gap-2 font-bold text-2xl tracking-tighter cursor-pointer" onClick={onGoHome}>
+          <Scissors className="w-6 h-6 text-white" />
+          <span>BarberFlow</span>
+        </div>
+        
+        {/* Desktop Menu */}
+        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
+          {navLinks.map(link => (
+            <a key={link.name} href={link.href} onClick={link.onClick} className="hover:text-white transition-colors">{link.name}</a>
+          ))}
+          {user && (
+            <button onClick={onGoToDashboard} className="flex items-center gap-2 text-white hover:text-gray-300 transition-colors">
+              <LayoutDashboard className="w-4 h-4" />
+              {user.role === 'admin' ? 'Painel ADM' : 'Meu Perfil'}
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-4">
+          {user ? (
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-400 hidden sm:inline">Olá, <span className="text-white font-bold">{user.name}</span></span>
+              <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors hidden sm:block">
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={onOpenAuth}
+              className="hidden md:block bg-white text-black px-6 py-2 rounded-full text-sm font-bold hover:bg-gray-200 transition-all"
+            >
+              Entrar
+            </button>
+          )}
+
+          {/* Mobile Menu Toggle */}
+          <button 
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="md:hidden p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
-        )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        {user ? (
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-400 hidden sm:inline">Olá, <span className="text-white font-bold">{user.name}</span></span>
-            <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        ) : (
-          <button 
-            onClick={onOpenAuth}
-            className="bg-white text-black px-6 py-2 rounded-full text-sm font-bold hover:bg-gray-200 transition-all"
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden border-t border-white/10 bg-black overflow-hidden"
           >
-            Entrar / Cadastrar
-          </button>
+            <div className="px-6 py-8 space-y-6">
+              {navLinks.map(link => (
+                <a 
+                  key={link.name} 
+                  href={link.href} 
+                  onClick={() => {
+                    link.onClick();
+                    setIsMenuOpen(false);
+                  }} 
+                  className="block text-xl font-bold text-gray-400 hover:text-white transition-colors"
+                >
+                  {link.name}
+                </a>
+              ))}
+              {user && (
+                <button 
+                  onClick={() => {
+                    onGoToDashboard();
+                    setIsMenuOpen(false);
+                  }} 
+                  className="w-full flex items-center gap-3 text-xl font-bold text-white"
+                >
+                  <LayoutDashboard className="w-6 h-6" />
+                  {user.role === 'admin' ? 'Painel ADM' : 'Meu Perfil'}
+                </button>
+              )}
+              {user ? (
+                <button 
+                  onClick={() => {
+                    onLogout();
+                    setIsMenuOpen(false);
+                  }} 
+                  className="w-full flex items-center gap-3 text-xl font-bold text-red-500"
+                >
+                  <LogOut className="w-6 h-6" />
+                  Sair
+                </button>
+              ) : (
+                <button 
+                  onClick={() => {
+                    onOpenAuth();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full bg-white text-black py-4 rounded-xl font-bold"
+                >
+                  Entrar / Cadastrar
+                </button>
+              )}
+            </div>
+          </motion.div>
         )}
-      </div>
-    </div>
-  </nav>
-);
+      </AnimatePresence>
+    </nav>
+  );
+};
 
 const StepIndicator = ({ currentStep }: { currentStep: number }) => {
   const steps = ['Serviço', 'Barbeiro', 'Horário', 'Pagamento'];
@@ -623,6 +707,139 @@ const AdminDashboard = ({ user, appointments, barbers, services, settings, onAdd
   );
 };
 
+const ClientDashboard = ({ user, appointments, services, barbers, onUpdateUser }: { 
+  user: UserType,
+  appointments: Appointment[],
+  services: Service[],
+  barbers: Barber[],
+  onUpdateUser: (user: UserType) => void
+}) => {
+  const [activeTab, setActiveTab] = useState<'appointments' | 'profile'>('appointments');
+  const [editedUser, setEditedUser] = useState(user);
+
+  const myAppointments = useMemo(() => {
+    return appointments.filter(app => app.clientId === user.id)
+      .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+  }, [appointments, user.id]);
+
+  return (
+    <div className="space-y-12">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <div>
+          <h2 className="text-4xl font-bold tracking-tight">Olá, {user.name}</h2>
+          <p className="text-gray-500 font-medium">Bem-vindo ao seu painel de agendamentos</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 border-b border-white/10 overflow-x-auto pb-px scrollbar-hide">
+        {[
+          { id: 'appointments', name: 'Meus Agendamentos', icon: CalendarIcon },
+          { id: 'profile', name: 'Meu Perfil', icon: UserIcon },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-2 px-6 py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
+              activeTab === tab.id ? 'border-white text-white' : 'border-transparent text-gray-500 hover:text-white'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.name}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'appointments' && (
+        <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+          <div className="p-8 border-b border-white/10 flex items-center justify-between">
+            <h3 className="text-xl font-bold">Histórico de Agendamentos</h3>
+            <span className="text-xs text-gray-500 font-mono uppercase tracking-widest">{myAppointments.length} registros</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] font-bold uppercase tracking-widest text-gray-500 border-b border-white/10">
+                  <th className="px-8 py-4">Data</th>
+                  <th className="px-8 py-4">Barbeiro</th>
+                  <th className="px-8 py-4">Serviço</th>
+                  <th className="px-8 py-4 text-right">Valor</th>
+                  <th className="px-8 py-4 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {myAppointments.map(app => {
+                  const service = services.find(s => s.id === app.serviceId);
+                  const barber = barbers.find(b => b.id === app.barberId);
+                  return (
+                    <tr key={app.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-8 py-6 text-sm text-gray-400">{format(parseISO(app.date), 'dd/MM/yy HH:mm')}</td>
+                      <td className="px-8 py-6 font-bold">{barber?.name}</td>
+                      <td className="px-8 py-6 text-gray-400">{app.serviceName}</td>
+                      <td className="px-8 py-6 text-right font-bold">R$ {service?.price}</td>
+                      <td className="px-8 py-6 text-center">
+                        <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                          {app.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {myAppointments.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-8 py-20 text-center text-gray-500">
+                      Você ainda não possui agendamentos.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'profile' && (
+        <div className="max-w-md bg-white/5 border border-white/10 rounded-3xl p-8 space-y-6">
+          <h3 className="text-xl font-bold mb-6">Editar Perfil</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Nome</label>
+              <input 
+                value={editedUser.name}
+                onChange={e => setEditedUser({...editedUser, name: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">E-mail</label>
+              <input 
+                value={editedUser.email}
+                onChange={e => setEditedUser({...editedUser, email: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Nova Senha</label>
+              <input 
+                type="password"
+                value={editedUser.password || ''}
+                onChange={e => setEditedUser({...editedUser, password: e.target.value})}
+                placeholder="Deixe em branco para manter a atual"
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-white/40" 
+              />
+            </div>
+            <button 
+              onClick={() => onUpdateUser(editedUser)}
+              className="w-full bg-white text-black py-4 rounded-xl font-bold mt-4 hover:bg-gray-200"
+            >
+              Salvar Alterações
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- Barber Dashboard ---
 
 const BarberDashboard = ({ user, barber, appointments, services, onUpdateProfile, onUpdateUser }: { 
@@ -636,6 +853,7 @@ const BarberDashboard = ({ user, barber, appointments, services, onUpdateProfile
   const [activeTab, setActiveTab] = useState<'stats' | 'history' | 'profile'>('stats');
   const [editedBarber, setEditedBarber] = useState(barber);
   const [editedUser, setEditedUser] = useState(user);
+// ... existing code ...
 
   const myAppointments = useMemo(() => {
     return appointments.filter(app => app.barberId === barber.id)
@@ -1024,6 +1242,45 @@ export default function App() {
             </div>
           </section>
 
+          {/* Products Section */}
+          <section id="products" className="py-32 bg-white/5">
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="mb-16">
+                <span className="text-xs font-bold uppercase tracking-[0.3em] text-gray-500 mb-4 block">Shop</span>
+                <h2 className="text-5xl font-bold tracking-tight">Produtos Premium</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {[
+                  { name: 'Pomada Matte', price: 65, img: 'https://images.unsplash.com/photo-1590159763121-7c9fd312190d?auto=format&fit=crop&q=80&w=800' },
+                  { name: 'Óleo para Barba', price: 45, img: 'https://images.unsplash.com/photo-1626285861696-9f0bf5a49c6d?auto=format&fit=crop&q=80&w=800' },
+                  { name: 'Shampoo de Carvão', price: 55, img: 'https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?auto=format&fit=crop&q=80&w=800' },
+                ].map((product, idx) => (
+                  <motion.div 
+                    key={idx}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    className="group relative overflow-hidden rounded-3xl bg-black border border-white/10"
+                  >
+                    <div className="aspect-square overflow-hidden">
+                      <img src={product.img} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 group-hover:scale-110" alt={product.name} />
+                    </div>
+                    <div className="p-8">
+                      <h3 className="text-xl font-bold mb-2">{product.name}</h3>
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl font-bold">R$ {product.price}</span>
+                        <button className="p-3 bg-white text-black rounded-full hover:scale-110 transition-transform">
+                          <ShoppingBag className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </section>
+
           {/* Barbers Section */}
           <section id="barbers" className="py-32 bg-white/[0.02] border-y border-white/5">
             <div className="max-w-7xl mx-auto px-6">
@@ -1222,6 +1479,19 @@ export default function App() {
                 storageService.setCurrentUser(u);
                 setUser(u);
                 alert('Dados de acesso atualizados!');
+              }}
+            />
+          ) : user ? (
+            <ClientDashboard 
+              user={user}
+              appointments={appointments}
+              services={services}
+              barbers={barbers}
+              onUpdateUser={(u) => {
+                storageService.saveUser(u);
+                storageService.setCurrentUser(u);
+                setUser(u);
+                alert('Perfil atualizado com sucesso!');
               }}
             />
           ) : (
