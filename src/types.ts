@@ -28,11 +28,14 @@ export interface Barber {
   avatarUrl: string;
   bio: string;
   rating: number;
+  commissionRate: number; // percentage (e.g., 30 for 30%)
 }
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'client';
+  password?: string;
+  role: 'admin' | 'barber' | 'client';
+  barberId?: string; // linked barber profile if role is 'barber'
 }

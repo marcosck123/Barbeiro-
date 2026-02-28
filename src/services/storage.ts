@@ -16,10 +16,18 @@ const DEFAULT_SERVICES: Service[] = [
 ];
 
 const DEFAULT_BARBERS: Barber[] = [
-  { id: 'b1', name: 'Ricardo "The Blade"', role: 'Master Barber', avatarUrl: 'https://i.pravatar.cc/150?u=b1', bio: 'Especialista em cortes clássicos e barbas.', rating: 4.9 },
-  { id: 'b2', name: 'Lucas Silva', role: 'Fade Specialist', avatarUrl: 'https://i.pravatar.cc/150?u=b2', bio: 'Mestre do degradê e estilos urbanos.', rating: 4.8 },
-  { id: 'b3', name: 'André Santos', role: 'Stylist', avatarUrl: 'https://i.pravatar.cc/150?u=b3', bio: 'Transformando visuais com precisão.', rating: 5.0 },
+  { id: 'b1', name: 'Ricardo "The Blade"', role: 'Master Barber', avatarUrl: 'https://i.pravatar.cc/150?u=b1', bio: 'Especialista em cortes clássicos e barbas.', rating: 4.9, commissionRate: 40 },
+  { id: 'b2', name: 'Lucas Silva', role: 'Fade Specialist', avatarUrl: 'https://i.pravatar.cc/150?u=b2', bio: 'Mestre do degradê e estilos urbanos.', rating: 4.8, commissionRate: 30 },
+  { id: 'b3', name: 'André Santos', role: 'Stylist', avatarUrl: 'https://i.pravatar.cc/150?u=b3', bio: 'Transformando visuais com precisão.', rating: 5.0, commissionRate: 35 },
 ];
+
+const ADMIN_USER: User = {
+  id: 'admin-1',
+  name: 'Marcos Eduardo',
+  email: 'marcoseduardock@gmail.com',
+  password: '12345',
+  role: 'admin'
+};
 
 export const storageService = {
   getAppointments: (): Appointment[] => {
@@ -54,10 +62,23 @@ export const storageService = {
     return data ? JSON.parse(data) : DEFAULT_BARBERS;
   },
 
+  saveBarber: (barber: Barber) => {
+    const barbers = storageService.getBarbers();
+    const index = barbers.findIndex(b => b.id === barber.id);
+    if (index >= 0) barbers[index] = barber;
+    else barbers.push(barber);
+    localStorage.setItem(STORAGE_KEYS.BARBERS, JSON.stringify(barbers));
+  },
+
   getUsers: (): User[] => {
-    if (typeof localStorage === 'undefined') return [];
+    if (typeof localStorage === 'undefined') return [ADMIN_USER];
     const data = localStorage.getItem(STORAGE_KEYS.USERS);
-    return data ? JSON.parse(data) : [];
+    const users = data ? JSON.parse(data) : [ADMIN_USER];
+    // Ensure admin is always there
+    if (!users.find((u: User) => u.email === ADMIN_USER.email)) {
+      users.push(ADMIN_USER);
+    }
+    return users;
   },
 
   registerUser: (user: User) => {
